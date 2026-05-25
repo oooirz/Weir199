@@ -1,0 +1,279 @@
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NuvexLocalTest"
+ScreenGui.ResetOnSpawn = false
+
+-- เคลียร์อินเตอร์เฟสเก่าที่ค้างอยู่บนจอ
+if game:GetService("CoreGui"):FindFirstChild("NuvexLocalTest") then
+    game:GetService("CoreGui"):FindFirstChild("NuvexLocalTest"):Destroy()
+end
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- // บริการระบบ
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- // ตัวแปรเก็บสถานะฟีเจอร์
+local Features = {
+    Aimbot = false,
+    Fly = false,
+    Ghost = false,
+    Esp = false
+}
+
+-- // ตัวแปรระบบล็อกหัว
+local AimTarget = nil
+local AimOffset = Vector3.new(0, -0.5, 0) -- ปรับจุดล็อกให้ตรงหัว
+local FlySpeed = 25
+local Flying = false
+
+-- 📸 ปุ่มเปิด/ปิดหน้าต่างหลัก (Floating Button)
+local FloatBtn = Instance.new("ImageButton")
+FloatBtn.Parent = ScreenGui
+FloatBtn.Position = UDim2.new(0.5, -20, 0.05, 0)
+FloatBtn.Size = UDim2.new(0, 40, 0, 40)
+FloatBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+FloatBtn.Image = "rbxassetid://13444458514"
+
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
+local BtnStroke = Instance.new("UIStroke", FloatBtn)
+BtnStroke.Color = Color3.fromRGB(212, 175, 55)
+BtnStroke.Thickness = 2
+
+-- 👑 หน้าต่างควบคุมหลัก (Main Frame)
+local Main = Instance.new("Frame")
+Main.Parent = ScreenGui
+Main.Position = UDim2.new(0.5, -150, 0.5, -150)
+Main.Size = UDim2.new(0, 300, 0, 350) -- เพิ่มขนาดให้พอปุ่ม
+Main.BackgroundColor3 = Color3.fromRGB(18, 19, 26)
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(32, 30, 38)
+
+-- หัวข้อเมนูภาษาไทย
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "👑 ไซเบอร์ นูเวกซ์"
+Title.TextColor3 = Color3.fromRGB(255, 51, 119)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.BackgroundTransparency = 1
+
+local Sub = Instance.new("TextLabel", Main)
+Sub.Position = UDim2.new(0, 0, 0, 25)
+Sub.Size = UDim2.new(1, 0, 0, 15)
+Sub.Text = "ระบบทดสอบโครงสร้าง UI ออฟไลน์"
+Sub.TextColor3 = Color3.fromRGB(138, 139, 156)
+Sub.TextSize = 10
+Sub.Font = Enum.Font.SourceSans
+Sub.BackgroundTransparency = 1
+
+-- 🖐️ ระบบลากหน้าต่างขยับไปมาบนหน้าจอ (Drag System)
+local drag, dragIn, start, startPos
+Main.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        drag = true start = i.Position startPos = Main.Position
+        i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then drag = false end end)
+    end
+end)
+Main.InputChanged:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then dragIn = i end end)
+UIS.InputChanged:Connect(function(i) if i == dragIn and drag then local d = i.Position - start Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y) end end)
+
+-- สั่งเปิด/ปิดหน้าต่างเมื่อกดปุ่มลอย
+FloatBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+
+-- 📜 พื้นที่เลื่อนรายการด้านใน
+local Scroll = Instance.new("ScrollingFrame", Main)
+Scroll.Position = UDim2.new(0, 10, 0, 50)
+Scroll.Size = UDim2.new(1, -20, 1, -85)
+Scroll.BackgroundTransparency = 1
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 220) -- ปรับขนาดพื้นที่
+Scroll.ScrollBarThickness = 2
+
+local Layout = Instance.new("UIListLayout", Scroll)
+Layout.Padding = UDim.new(0, 6)
+
+-- ฟังก์ชันสร้างปุ่มทดสอบ
+local function NewBtn(txt, featureKey)
+    local B = Instance.new("TextButton", Scroll)
+    B.Size = UDim2.new(1, 0, 0, 35)
+    B.BackgroundColor3 = Color3.fromRGB(26, 27, 38)
+    B.Text = txt
+    B.TextColor3 = Color3.fromRGB(203, 213, 225)
+    B.TextSize = 12
+    B.Font = Enum.Font.SourceSansBold
+    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 6)
+    local S = Instance.new("UIStroke", B) S.Color = Color3.fromRGB(39, 41, 61)
+
+    B.MouseButton1Click:Connect(function()
+        Features[featureKey] = not Features[featureKey]
+        S.Color = Features[featureKey] and Color3.fromRGB(51, 166, 255) or Color3.fromRGB(39, 41, 61)
+        B.BackgroundColor3 = Features[featureKey] and Color3.fromRGB(22, 42, 61) or Color3.fromRGB(26, 27, 38)
+        Status.Text = "สถานะ: "..txt.." -> "..(Features[featureKey] and "เปิดใช้งาน ✅" or "ปิดใช้งาน ❌")
+    end)
+end
+
+-- เพิ่มรายการปุ่มฟีเจอร์ต่างๆ
+NewBtn("🎯 ระบบล็อกหัว", "Aimbot")
+NewBtn("✈️ ระบบบิน", "Fly")
+NewBtn("👻 ระบบหายตัว", "Ghost")
+NewBtn("👁️ ระบบมองทะลุ", "Esp")
+
+-- 🪵 แถบสถานะด้านล่างสุด
+local Status = Instance.new("TextLabel", Main)
+Status.Position = UDim2.new(0, 10, 1, -28)
+Status.Size = UDim2.new(1, -20, 0, 20)
+Status.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Status.Text = "สถานะ: พร้อมทดสอบจัดวางตำแหน่ง"
+Status.TextColor3 = Color3.fromRGB(0, 255, 204)
+Status.TextSize = 10
+Status.Font = Enum.Font.Code
+Instance.new("UICorner", Status).CornerRadius = UDim.new(0, 4)
+
+-- ==================================================
+-- 🎯 ระบบล็อกหัว (Aimbot)
+-- ==================================================
+local function GetClosestPlayer()
+    local Closest, Dist = nil, math.huge
+    for _, Plr in pairs(Players:GetPlayers()) do
+        if Plr ~= LocalPlayer and Plr.Character and Plr.Character:FindFirstChild("Head") then
+            local Pos = Camera:WorldToScreenPoint(Plr.Character.Head.Position)
+            if Pos.Z > 0 then
+                local Mag = (Vector2.new(Pos.X, Pos.Y) - UIS:GetMouseLocation()).Magnitude
+                if Mag < Dist then
+                    Dist = Mag
+                    Closest = Plr.Character.Head
+                end
+            end
+        end
+    end
+    return Closest
+end
+
+-- ==================================================
+-- ✈️ ระบบบิน (Fly)
+-- ==================================================
+UIS.InputBegan:Connect(function(Input, GP)
+    if GP then return end
+    if Features.Fly and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local Hum = LocalPlayer.Character.Humanoid
+        if Input.KeyCode == Enum.KeyCode.Space then
+            FlySpeed = 50
+        elseif Input.KeyCode == Enum.KeyCode.LeftControl then
+            FlySpeed = 10
+        end
+    end
+end)
+
+UIS.InputEnded:Connect(function(Input)
+    if Input.KeyCode == Enum.KeyCode.Space or Input.KeyCode == Enum.KeyCode.LeftControl then
+        FlySpeed = 25
+    end
+end)
+
+-- ==================================================
+-- 👁️ ระบบมองทะลุ (ESP)
+-- ==================================================
+local ESPObjects = {}
+local function CreateESP(Model)
+    if ESPObjects[Model] then return end
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = "NuvexESP"
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0
+    Highlight.FillColor = Color3.fromRGB(255, 0, 85)
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    Highlight.Adornee = Model
+    Highlight.Parent = Model
+    ESPObjects[Model] = Highlight
+end
+
+local function RemoveESP(Model)
+    if ESPObjects[Model] then
+        ESPObjects[Model]:Destroy()
+        ESPObjects[Model] = nil
+    end
+end
+
+-- ==================================================
+-- 🔄 ลูปทำงานหลัก
+-- ==================================================
+RunService.RenderStepped:Connect(function()
+    local Char = LocalPlayer.Character
+    if not Char or not Char:FindFirstChild("HumanoidRootPart") then return end
+    local Hum = Char:FindFirstChild("Humanoid")
+    if not Hum then return end
+
+    -- 🎯 ล็อกหัว
+    if Features.Aimbot then
+        AimTarget = GetClosestPlayer()
+        if AimTarget then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, AimTarget.Position + AimOffset)
+        end
+    end
+
+    -- ✈️ บิน
+    if Features.Fly then
+        Hum.PlatformStand = true
+        Hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        Hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        Hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        
+        local MoveDir = Vector3.new()
+        if UIS:IsKeyDown(Enum.KeyCode.W) then MoveDir += Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then MoveDir -= Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then MoveDir -= Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then MoveDir += Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then MoveDir += Vector3.new(0, 1, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then MoveDir -= Vector3.new(0, 1, 0) end
+
+        if MoveDir.Magnitude > 0 then
+            Char.HumanoidRootPart.Velocity = MoveDir.Unit * FlySpeed
+        else
+            Char.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+        end
+    else
+        Hum.PlatformStand = false
+        Hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+        Hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        Hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+    end
+
+    -- 👻 หายตัว
+    if Features.Ghost then
+        for _, Part in pairs(Char:GetDescendants()) do
+            if Part:IsA("BasePart") or Part:IsA("Decal") then
+                Part.Transparency = 1
+            end
+        end
+        Hum.DisplayType = Enum.HumanoidDisplayType.None
+    else
+        for _, Part in pairs(Char:GetDescendants()) do
+            if Part:IsA("BasePart") then
+                Part.Transparency = 0
+            elseif Part:IsA("Decal") then
+                Part.Transparency = 0
+            end
+        end
+        Hum.DisplayType = Enum.HumanoidDisplayType.Default
+    end
+
+    -- 👁️ มองทะลุ
+    if Features.Esp then
+        for _, Plr in pairs(Players:GetPlayers()) do
+            if Plr ~= LocalPlayer and Plr.Character then
+                CreateESP(Plr.Character)
+            end
+        end
+    else
+        for Plr, Obj in pairs(ESPObjects) do
+            RemoveESP(Plr)
+        end
+    end
+
+end)
+
